@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #12100E;
+  color: #F4EFE8;
+}
+
+/* Keep focus rings visible for keyboard users without adding a ring to every
+   mouse click — Tailwind's focus-visible utilities aren't in this version's
+   default preset, so this is a minimal manual equivalent. */
+:focus {
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A3038;
+  border-radius: 999px;
+}

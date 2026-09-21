@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Env
+.env
+.env.local
+
+# Real transcript data downloaded via scripts/download_transcripts.py — licensed
+# third-party content (see backend/scripts/download_transcripts.py docstring),
+# never committed to source control.
+backend/data/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.tsbuildinfo

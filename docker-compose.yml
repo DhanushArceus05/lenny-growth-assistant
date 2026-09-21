@@ -1,0 +1,85 @@
+# One-command startup: `docker compose up --build`
+#
+# This brings up db + backend + frontend + an Ollama container. The Ollama *model*
+# itself is deliberately NOT pulled automatically on startup — a multi-GB download
+# blocking `docker compose up` makes evaluation unreliable (per the assignment's own
+# guidance). Pull it once after the stack is up:
+#
+#   docker compose exec ollama ollama pull llama3.2:3b
+#
+# If you'd rather run Ollama natively on the host (recommended for GPU/Metal
+# acceleration), stop the `ollama` service and set OLLAMA_BASE_URL in .env to
+# http://host.docker.internal:11434 instead.
+#
+# Port conflict on your machine (e.g. something else already uses :3000 or :8000)?
+# Compose reads .env for variable substitution here too — add FRONTEND_PORT and/or
+# BACKEND_PORT to your .env (e.g. FRONTEND_PORT=3002) and both the port mapping
+# AND the CORS/API-URL values below update together, so you don't end up with a
+# frontend on a new port that the backend then rejects via CORS.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: lenny_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: lenny_assistant
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lenny_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # No `command: ollama pull ...` here on purpose — see note above.
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lenny_backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password123@db:5432/lenny_assistant
+      OLLAMA_BASE_URL: http://ollama:11434
+      # Comma-separated — always includes :3002 explicitly as a safety net,
+      # since FRONTEND_PORT may not be set even when the frontend's host port
+      # mapping was changed directly. Extra allowed origins are harmless.
+      FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-3000},http://localhost:3002
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8000}
+    container_name: lenny_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8000}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  ollama_data:
