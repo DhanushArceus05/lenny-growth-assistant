@@ -4,6 +4,7 @@ a Docker Compose run, and a hosted deployment lives here and only here — no ot
 module should read `os.environ` directly.
 """
 from functools import lru_cache
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,26 @@ class Settings(BaseSettings):
 
     # --- Database ---
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password123@localhost:5432/lenny_assistant"
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _normalize_async_driver(cls, v: str) -> str:
+        """Managed Postgres providers (Railway, Heroku, etc.) inject DATABASE_URL
+        using the plain libpq scheme (`postgresql://`, sometimes the legacy
+        `postgres://`), not the SQLAlchemy driver-qualified `postgresql+asyncpg://`
+        our async engine requires — passing the plain scheme straight through
+        resolves to a sync driver and crashes `create_async_engine`. Normalized
+        once here so `database.py` and everywhere else can keep using
+        `settings.DATABASE_URL` unchanged; an already-correct
+        `postgresql+asyncpg://` URL (and non-Postgres URLs like the sqlite one
+        tests use) pass through untouched."""
+        if v.startswith("postgresql+asyncpg://"):
+            return v
+        if v.startswith("postgres://"):
+            return "postgresql+asyncpg://" + v[len("postgres://") :]
+        if v.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + v[len("postgresql://") :]
+        return v
 
     # --- LLM providers ---
     DEFAULT_LLM_PROVIDER: str = "ollama"  # "ollama" | "anthropic"
